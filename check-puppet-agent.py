@@ -77,16 +77,34 @@ run_lock_file = '/var/lib/puppet/state/agent_catalog_run.lock'
 # noinspection PyBroadException
 try:
     parser = ArgumentParser('check_puppet')
-    parser.add_argument('--max-run-age', type=int, default=120 * 60,
-                        help='max age of last puppet run in seconds (default: 120 * 60)')
-    parser.add_argument('--max-catalog-age', type=int, default=120 * 60,
-                        help='max age of the applied catalog in seconds (default: 120 * 60)')
-    parser.add_argument('--max-run-duration', type=int, default=30 * 60,
-                        help='max age of the applied catalog in seconds (default: 30 * 60)')
+    parser.add_argument('--warning-run-age', type=int, default=65 * 60,
+                        help='warn at age of last puppet run in seconds (default: 65 * 60) => 0 or -1 to disable')
+    parser.add_argument('--critical-run-age', type=int, default=130 * 60,
+                        help='critical at age of last puppet run in seconds (default: 130 * 60) => 0 or -1 to disable')
+    parser.add_argument('--warning-catalog-age', type=int, default=65 * 60,
+                        help='warn at catalog age in seconds (default: 65 * 60) => 0 or -1 to disable')
+    parser.add_argument('--critical-catalog-age', type=int, default=130 * 60,
+                        help='critical at catalog age in seconds (default: 130 * 60) => 0 or -1 to disable')
+    parser.add_argument('--warning-run-duration', type=int, default=20 * 60,
+                        help='warn at puppet run duration in  seconds (default: 20 * 60) => 0 or -1 to disable')
+    parser.add_argument('--critical-run-duration', type=int, default=30 * 60,
+                        help='critical at puppet run duration in seconds (default: 30 * 60) => 0 or -1 to disable')
     parser.add_argument('--filename', default='/var/lib/puppet/state/last_run_summary.yaml',
                         help='the puppet state file to parse')
 
     args = parser.parse_args()
+
+    if 0 < args.warning_run_age >= args.critical_run_age:
+        status.add_status(MonitoringStatus.WARNING,
+                          '--warning-run-age should be lower than --critical-warn-age')
+
+    if 0 < args.warning_catalog_age >= args.critical_catalog_age:
+        status.add_status(MonitoringStatus.WARNING,
+                          '--warning-catalog-age should be lower than --critical-catalog-age')
+
+    if 0 < args.warning_run_duration >= args.critical_run_duration:
+        status.add_status(MonitoringStatus.WARNING,
+                          '--warning-run-duration should be lower than --critical-run-duration')
 
     with open(args.filename, 'r') as f:
         run_summary = yaml.load(f)
@@ -104,7 +122,9 @@ try:
             run_lock_date = datetime.fromtimestamp(run_lock_mtime)
             run_lock_age = datetime.now() - run_lock_date
 
-            if 0 < args.max_run_duration < run_lock_age:
+            if 0 < args.critical_run_duration <= run_lock_age:
+                run_lock_status = MonitoringStatus.CRITICAL
+            elif 0 < args.warning_run_duration <= run_lock_age:
                 run_lock_status = MonitoringStatus.WARNING
             else:
                 run_lock_status = MonitoringStatus.OK
@@ -122,7 +142,9 @@ try:
                 catalog_date = datetime.fromtimestamp(catalog_time)
                 catalog_age = datetime.now() - catalog_date
 
-                if 0 < args.max_catalog_age < timedelta_total_seconds(catalog_age):
+                if 0 < args.critical_catalog_age <= timedelta_total_seconds(catalog_age):
+                    catalog_status = MonitoringStatus.CRITICAL
+                elif 0 < args.warning_catalog_age <= timedelta_total_seconds(catalog_age):
                     catalog_status = MonitoringStatus.WARNING
                 else:
                     catalog_status = MonitoringStatus.OK
@@ -144,7 +166,9 @@ try:
                     run_date = datetime.fromtimestamp(last_run)
                     run_age = datetime.now() - run_date
 
-                    if 0 < args.max_run_age < timedelta_total_seconds(run_age):
+                    if 0 < args.critical_run_age <= timedelta_total_seconds(run_age):
+                        run_status = MonitoringStatus.CRITICAL
+                    elif 0 < args.warning_run_age <= timedelta_total_seconds(run_age):
                         run_status = MonitoringStatus.WARNING
                     else:
                         run_status = MonitoringStatus.OK
@@ -158,7 +182,9 @@ try:
                     else:
                         run_duration = timedelta(seconds=run_summary['time']['total'])
 
-                        if 0 < args.max_run_duration < timedelta_total_seconds(run_duration):
+                        if 0 < args.critical_run_duration <= timedelta_total_seconds(run_duration):
+                            run_duration_status = MonitoringStatus.CRITICAL
+                        elif 0 < args.warning_run_duration <= timedelta_total_seconds(run_duration):
                             run_duration_status = MonitoringStatus.WARNING
                         else:
                             run_duration_status = MonitoringStatus.OK
