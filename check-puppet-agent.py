@@ -3,7 +3,7 @@
 # Copyright 2015, wywy GmbH
 # Author: Christian Becker <christian.becker@wywy.com>
 from argparse import ArgumentParser
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import sys
 import yaml
@@ -79,6 +79,10 @@ try:
     parser = ArgumentParser('check_puppet')
     parser.add_argument('--max-run-age', type=int, default=120 * 60,
                         help='max age of last puppet run in seconds (default: 120 * 60)')
+    parser.add_argument('--max-catalog-age', type=int, default=120 * 60,
+                        help='max age of the applied catalog in seconds (default: 120 * 60)')
+    parser.add_argument('--max-run-duration', type=int, default=30 * 60,
+                        help='max age of the applied catalog in seconds (default: 30 * 60)')
     parser.add_argument('--filename', default='/var/lib/puppet/state/last_run_summary.yaml',
                         help='the puppet state file to parse')
 
@@ -88,7 +92,6 @@ try:
         run_summary = yaml.load(f)
 
         if os.path.isfile(disabled_lock_file):
-
             with open(disabled_lock_file, 'r') as disabled_file:
                 disabled_content = yaml.load(disabled_file)
 
@@ -101,7 +104,7 @@ try:
             run_lock_date = datetime.fromtimestamp(run_lock_mtime)
             run_lock_age = datetime.now() - run_lock_date
 
-            if run_lock_age > args.max_run_age:
+            if 0 < args.max_run_duration < run_lock_age:
                 run_lock_status = MonitoringStatus.WARNING
             else:
                 run_lock_status = MonitoringStatus.OK
@@ -119,7 +122,7 @@ try:
                 catalog_date = datetime.fromtimestamp(catalog_time)
                 catalog_age = datetime.now() - catalog_date
 
-                if timedelta_total_seconds(catalog_age) > args.max_run_age:
+                if 0 < args.max_catalog_age < timedelta_total_seconds(catalog_age):
                     catalog_status = MonitoringStatus.WARNING
                 else:
                     catalog_status = MonitoringStatus.OK
@@ -141,7 +144,7 @@ try:
                     run_date = datetime.fromtimestamp(last_run)
                     run_age = datetime.now() - run_date
 
-                    if timedelta_total_seconds(run_age) > args.max_run_age:
+                    if 0 < args.max_run_age < timedelta_total_seconds(run_age):
                         run_status = MonitoringStatus.WARNING
                     else:
                         run_status = MonitoringStatus.OK
@@ -153,9 +156,15 @@ try:
                         status.add_status(MonitoringStatus.WARNING,
                                           'Can not find "total" time in {file}'.format(file=args.filename))
                     else:
-                        status.add_status(MonitoringStatus.OK,
-                                          '=> last run took {seconds:.1f} seconds'.format(
-                                              seconds=run_summary['time']['total']))
+                        run_duration = timedelta(seconds=run_summary['time']['total'])
+
+                        if 0 < args.max_run_duration < timedelta_total_seconds(run_duration):
+                            run_duration_status = MonitoringStatus.WARNING
+                        else:
+                            run_duration_status = MonitoringStatus.OK
+
+                        status.add_status(run_duration_status,
+                                          '=> last run took {duration}'.format(duration=format_timedelta(run_duration)))
 
 
 # catch all exceptions to create an error in the monitoring in case anything goes wrong in this script
