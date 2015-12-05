@@ -46,6 +46,16 @@ def format_timedelta(delta):
     return ' '.join(delta_items)
 
 
+def format_datetime(time):
+    """
+    :param time: the input time to format
+    :type time: datetime
+    :return: formatted date string
+    :rtype: str
+    """
+    return time.strftime('%Y-%m-%d %H:%M:%S')
+
+
 class MonitoringStatus:
     OK = (0, 'OK')
     WARNING = (1, 'WARNING')
@@ -131,7 +141,7 @@ try:
 
             status.add_status(run_lock_status,
                               'puppet run active since {date} ({delta} ago)'.format(
-                                  date=run_lock_date.strftime('%Y-%m-%d %H:%M:%S'),
+                                  date=format_datetime(run_lock_date),
                                   delta=format_timedelta(run_lock_age)))
         else:
             if run_summary['version']['config'] is None:
@@ -151,7 +161,7 @@ try:
 
                 status.add_status(catalog_status,
                                   'applying catalog compiled at {date} ({delta} ago)'.format(
-                                      date=catalog_date.strftime('%Y-%m-%d %H:%M:%S'),
+                                      date=format_datetime(catalog_date),
                                       delta=format_timedelta(catalog_age)))
 
             if 'time' not in run_summary:
@@ -174,7 +184,7 @@ try:
                         run_status = MonitoringStatus.OK
 
                     status.add_status(run_status, 'last run on {date} ({delta} ago)'.format(
-                        date=run_date.strftime('%Y-%m-%d %H:%M:%S'), delta=format_timedelta(run_age)))
+                        date=format_datetime(run_date), delta=format_timedelta(run_age)))
 
                     if 'total' not in run_summary['time']:
                         status.add_status(MonitoringStatus.WARNING,
