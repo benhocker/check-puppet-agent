@@ -7,7 +7,43 @@ from datetime import datetime
 import os
 import sys
 import yaml
-import time
+
+
+def timedelta_total_seconds(td):
+    """
+    The timedelta.total_seconds() function was added in Python 2.7.
+    If total_seconds() exists, use it.  Otherwise calculate manually.
+    Source: https://bitbucket.org/wnielson/django-chronograph/src/f561106f6aaab62f2817e08e51c799320fd916d9/chronograph/compatibility/dates.py?at=default
+    @type   td: timedelta
+    @param  td: a timedelta where seconds should be "extracted"
+    @rtype: double
+    """
+    if hasattr(td, 'total_seconds'):
+        return td.total_seconds()
+    else:
+        return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10 ** 6) / 10 ** 6
+
+
+def format_timedelta(delta):
+    """ :type delta : timedelta """
+    delta_items = []
+    total_seconds = timedelta_total_seconds(delta)
+
+    if total_seconds > 86400:
+        (days, total_seconds) = divmod(total_seconds, 86400)
+        delta_items.append('{days:.0f} days'.format(days=days))
+
+    if total_seconds > 3600:
+        (hours, total_seconds) = divmod(total_seconds, 3600)
+        delta_items.append('{hours:.0f} hours'.format(hours=hours))
+
+    if total_seconds > 60:
+        (minutes, total_seconds) = divmod(total_seconds, 60)
+        delta_items.append('{minutes:.0f} minutes'.format(minutes=minutes))
+
+    delta_items.append('{seconds:.0f} seconds'.format(seconds=total_seconds))
+
+    return ' '.join(delta_items)
 
 
 class MonitoringStatus:
@@ -62,34 +98,36 @@ try:
 
         if os.path.exists(run_lock_file):
             run_lock_mtime = os.path.getmtime(run_lock_file)
-            run_lock_age = time.time() - run_lock_mtime
+            run_lock_date = datetime.fromtimestamp(run_lock_mtime)
+            run_lock_age = datetime.now() - run_lock_date
 
             if run_lock_age > args.max_run_age:
                 run_lock_status = MonitoringStatus.WARNING
             else:
                 run_lock_status = MonitoringStatus.OK
 
-            run_lock_date = datetime.fromtimestamp(run_lock_mtime)
             status.add_status(run_lock_status,
-                              'puppet run active since {date} ({minutes:.0f} minutes ago)'.format(
-                                  date=run_lock_date.strftime('%Y-%m-%d %H:%M:%S'), minutes=run_lock_age / 60))
+                              'puppet run active since {date} ({delta} ago)'.format(
+                                  date=run_lock_date.strftime('%Y-%m-%d %H:%M:%S'),
+                                  delta=format_timedelta(run_lock_age)))
         else:
             if run_summary['version']['config'] is None:
                 status.add_status(MonitoringStatus.WARNING,
                                   'no catalog received - catalog compile failed?')
             else:
                 catalog_time = run_summary['version']['config']
-                catalog_age = time.time() - catalog_time
+                catalog_date = datetime.fromtimestamp(catalog_time)
+                catalog_age = datetime.now() - catalog_date
 
-                if catalog_age > args.max_run_age:
+                if timedelta_total_seconds(catalog_age) > args.max_run_age:
                     catalog_status = MonitoringStatus.WARNING
                 else:
                     catalog_status = MonitoringStatus.OK
 
-                catalog_date = datetime.fromtimestamp(catalog_time)
                 status.add_status(catalog_status,
-                                  'applying catalog compiled at {date} ({minutes:.0f} minutes ago)'.format(
-                                      date=catalog_date.strftime('%Y-%m-%d %H:%M:%S'), minutes=catalog_age / 60))
+                                  'applying catalog compiled at {date} ({delta} ago)'.format(
+                                      date=catalog_date.strftime('%Y-%m-%d %H:%M:%S'),
+                                      delta=format_timedelta(catalog_age)))
 
             if 'time' not in run_summary:
                 status.add_status(MonitoringStatus.WARNING,
@@ -100,16 +138,16 @@ try:
                                       'Can not find last_run duration in {file}'.format(file=args.filename))
                 else:
                     last_run = run_summary['time']['last_run']
-                    run_age = time.time() - last_run
+                    run_date = datetime.fromtimestamp(last_run)
+                    run_age = datetime.now() - run_date
 
-                    if run_age > args.max_run_age:
+                    if timedelta_total_seconds(run_age) > args.max_run_age:
                         run_status = MonitoringStatus.WARNING
                     else:
                         run_status = MonitoringStatus.OK
 
-                    run_date = datetime.fromtimestamp(last_run)
-                    status.add_status(run_status, 'last run on {date} ({minutes:.0f} minutes ago)'.format(
-                        date=run_date.strftime('%Y-%m-%d %H:%M:%S'), minutes=run_age / 60))
+                    status.add_status(run_status, 'last run on {date} ({delta} ago)'.format(
+                        date=run_date.strftime('%Y-%m-%d %H:%M:%S'), delta=format_timedelta(run_age)))
 
                     if 'total' not in run_summary['time']:
                         status.add_status(MonitoringStatus.WARNING,
