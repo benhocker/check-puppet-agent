@@ -79,8 +79,6 @@ class MonitoringStatus:
 
 
 status = MonitoringStatus()
-disabled_lock_file = '/var/lib/puppet/state/agent_disabled.lock'
-run_lock_file = '/var/lib/puppet/state/agent_catalog_run.lock'
 
 # this try statement contains all of the code below on purpose
 # this is to ensure we have a critical state in the monitoring, in case anything goes wrong in here
@@ -101,6 +99,10 @@ try:
                         help='critical at puppet run duration in seconds (default: 30 * 60) => 0 or -1 to disable')
     parser.add_argument('--filename', default='/var/lib/puppet/state/last_run_summary.yaml',
                         help='the puppet state file to parse')
+    parser.add_argument('--disabled-lock-file', default='/var/lib/puppet/state/agent_disabled.lock',
+                        help='the path to the lock file if the agent is disabled')
+    parser.add_argument('--run-lock-file', default='/var/lib/puppet/state/agent_catalog_run.lock',
+                        help='the path to the lock file if the agent is running')
 
     args = parser.parse_args()
 
@@ -119,16 +121,16 @@ try:
     with open(args.filename, 'r') as f:
         run_summary = yaml.load(f)
 
-        if os.path.isfile(disabled_lock_file):
-            with open(disabled_lock_file, 'r') as disabled_file:
+        if os.path.isfile(args.disabled_lock_file):
+            with open(args.disabled_lock_file, 'r') as disabled_file:
                 disabled_content = yaml.load(disabled_file)
 
                 status.add_status(MonitoringStatus.WARNING,
                                   'puppet agent is disabled - reason: {reason}'.format(
                                       reason=disabled_content['disabled_message']))
 
-        if os.path.exists(run_lock_file):
-            run_lock_mtime = os.path.getmtime(run_lock_file)
+        if os.path.exists(args.run_lock_file):
+            run_lock_mtime = os.path.getmtime(args.run_lock_file)
             run_lock_date = datetime.fromtimestamp(run_lock_mtime)
             run_lock_age = datetime.now() - run_lock_date
 
