@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Copyright 2015, wywy GmbH
+# Author: Christian Becker <christian.becker@wywy.com>
 from argparse import ArgumentParser
 from datetime import datetime
 import os
