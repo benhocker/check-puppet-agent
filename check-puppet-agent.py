@@ -41,8 +41,8 @@ run_lock_file = '/var/lib/puppet/state/agent_catalog_run.lock'
 # noinspection PyBroadException
 try:
     parser = ArgumentParser('check_puppet')
-    parser.add_argument('--max-age', type=int, default=120,
-                        help='max age of last puppet run in minutes (default: 120)')
+    parser.add_argument('--max-run-age', type=int, default=120 * 60,
+                        help='max age of last puppet run in seconds (default: 120 * 60)')
     parser.add_argument('--filename', default='/var/lib/puppet/state/last_run_summary.yaml',
                         help='the puppet state file to parse')
 
@@ -62,9 +62,9 @@ try:
 
         if os.path.exists(run_lock_file):
             run_lock_mtime = os.path.getmtime(run_lock_file)
-            run_lock_age = (time.time() - run_lock_mtime) / 60
+            run_lock_age = time.time() - run_lock_mtime
 
-            if run_lock_age > args.max_age:
+            if run_lock_age > args.max_run_age:
                 run_lock_status = MonitoringStatus.WARNING
             else:
                 run_lock_status = MonitoringStatus.OK
@@ -72,16 +72,16 @@ try:
             run_lock_date = datetime.fromtimestamp(run_lock_mtime)
             status.add_status(run_lock_status,
                               'puppet run active since {date} ({minutes:.0f} minutes ago)'.format(
-                                  date=run_lock_date.strftime('%Y-%m-%d %H:%M:%S'), minutes=run_lock_age))
+                                  date=run_lock_date.strftime('%Y-%m-%d %H:%M:%S'), minutes=run_lock_age / 60))
         else:
             if run_summary['version']['config'] is None:
                 status.add_status(MonitoringStatus.WARNING,
                                   'no catalog received - catalog compile failed?')
             else:
                 catalog_time = run_summary['version']['config']
-                catalog_age = (time.time() - catalog_time) / 60
+                catalog_age = time.time() - catalog_time
 
-                if catalog_age > args.max_age:
+                if catalog_age > args.max_run_age:
                     catalog_status = MonitoringStatus.WARNING
                 else:
                     catalog_status = MonitoringStatus.OK
@@ -89,7 +89,7 @@ try:
                 catalog_date = datetime.fromtimestamp(catalog_time)
                 status.add_status(catalog_status,
                                   'applying catalog compiled at {date} ({minutes:.0f} minutes ago)'.format(
-                                      date=catalog_date.strftime('%Y-%m-%d %H:%M:%S'), minutes=catalog_age))
+                                      date=catalog_date.strftime('%Y-%m-%d %H:%M:%S'), minutes=catalog_age / 60))
 
             if 'time' not in run_summary:
                 status.add_status(MonitoringStatus.WARNING,
@@ -100,16 +100,16 @@ try:
                                       'Can not find last_run duration in {file}'.format(file=args.filename))
                 else:
                     last_run = run_summary['time']['last_run']
-                    run_age = (time.time() - last_run) / 60
+                    run_age = time.time() - last_run
 
-                    if run_age > args.max_age:
+                    if run_age > args.max_run_age:
                         run_status = MonitoringStatus.WARNING
                     else:
                         run_status = MonitoringStatus.OK
 
                     run_date = datetime.fromtimestamp(last_run)
                     status.add_status(run_status, 'last run on {date} ({minutes:.0f} minutes ago)'.format(
-                        date=run_date.strftime('%Y-%m-%d %H:%M:%S'), minutes=run_age))
+                        date=run_date.strftime('%Y-%m-%d %H:%M:%S'), minutes=run_age / 60))
 
                     if 'total' not in run_summary['time']:
                         status.add_status(MonitoringStatus.WARNING,
