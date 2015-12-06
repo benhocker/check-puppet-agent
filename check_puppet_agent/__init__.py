@@ -5,7 +5,6 @@
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
 import os
-import sys
 import yaml
 
 
@@ -78,12 +77,7 @@ class MonitoringStatus:
         exit(self.status[0])
 
 
-status = MonitoringStatus()
-
-# this try statement contains all of the code below on purpose
-# this is to ensure we have a critical state in the monitoring, in case anything goes wrong in here
-# noinspection PyBroadException
-try:
+def main(status):
     parser = ArgumentParser('check_puppet')
     parser.add_argument('--warning-run-age', type=int, default=65 * 60,
                         help='warn at age of last puppet run in seconds (default: 65 * 60) => 0 or -1 to disable')
@@ -203,11 +197,3 @@ try:
 
                         status.add_status(run_duration_status,
                                           '=> last run took {duration}'.format(duration=format_timedelta(run_duration)))
-
-
-# catch all exceptions to create an error in the monitoring in case anything goes wrong in this script
-except:
-    e = sys.exc_info()
-    status.add_status(MonitoringStatus.WARNING, str(e[1]))
-finally:
-    status.exit()
