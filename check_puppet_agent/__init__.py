@@ -4,8 +4,13 @@
 # Author: Christian Becker <christian.becker@wywy.com>
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
+import six
 import os
+import re
 import yaml
+
+timedelta_regex = re.compile(r'((?P<days>\d+?)d)?((?P<hours>\d+?)h)?((?P<minutes>\d+?)m)?((?P<seconds>\d+?)s)?')
+no_timedelta = timedelta()
 
 
 def timedelta_total_seconds(td):
@@ -21,6 +26,24 @@ def timedelta_total_seconds(td):
         return td.total_seconds()
     else:
         return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10 ** 6) / 10 ** 6
+
+
+def string_to_timedelta(time_str):
+    """
+    Parses a string with format 0d0h0m0s into a timedelta object
+    @type   time_str: str
+    @param  time_str: A string with format 0h0m0s
+    @rtype: timedelta
+    """
+    parts = timedelta_regex.match(time_str)
+    if not parts:
+        raise 'illegal timedelta string %s' % time_str
+    parts = parts.groupdict()
+    time_params = {}
+    for (name, param) in six.iteritems(parts):
+        if param:
+            time_params[name] = int(param)
+    return timedelta(**time_params)
 
 
 def format_timedelta(delta):
@@ -79,18 +102,18 @@ class MonitoringStatus:
 
 def main(status):
     parser = ArgumentParser('check_puppet')
-    parser.add_argument('--warning-run-age', type=int, default=65 * 60,
-                        help='warn at age of last puppet run in seconds (default: 65 * 60) => 0 or -1 to disable')
-    parser.add_argument('--critical-run-age', type=int, default=130 * 60,
-                        help='critical at age of last puppet run in seconds (default: 130 * 60) => 0 or -1 to disable')
-    parser.add_argument('--warning-catalog-age', type=int, default=65 * 60,
-                        help='warn at catalog age in seconds (default: 65 * 60) => 0 or -1 to disable')
-    parser.add_argument('--critical-catalog-age', type=int, default=130 * 60,
-                        help='critical at catalog age in seconds (default: 130 * 60) => 0 or -1 to disable')
-    parser.add_argument('--warning-run-duration', type=int, default=20 * 60,
-                        help='warn at puppet run duration in  seconds (default: 20 * 60) => 0 or -1 to disable')
-    parser.add_argument('--critical-run-duration', type=int, default=30 * 60,
-                        help='critical at puppet run duration in seconds (default: 30 * 60) => 0 or -1 to disable')
+    parser.add_argument('--warning-run-age', type=string_to_timedelta, default='1h5m',
+                        help='warn at age of last puppet run in seconds (default: 1h5m) => 0s to disable')
+    parser.add_argument('--critical-run-age', type=string_to_timedelta, default='2h10m',
+                        help='critical at age of last puppet run in seconds (default: 2h10m) => 0s to disable')
+    parser.add_argument('--warning-catalog-age', type=string_to_timedelta, default='1h5m',
+                        help='warn at catalog age in seconds (default: 1h5m) => 0s to disable')
+    parser.add_argument('--critical-catalog-age', type=string_to_timedelta, default='2h10m',
+                        help='critical at catalog age in seconds (default: 2h10m) => 0s to disable')
+    parser.add_argument('--warning-run-duration', type=string_to_timedelta, default='20m',
+                        help='warn at puppet run duration in  seconds (default: 20m) => 0s to disable')
+    parser.add_argument('--critical-run-duration', type=string_to_timedelta, default='30m',
+                        help='critical at puppet run duration in seconds (default: 30m) => 0s to disable')
     parser.add_argument('--filename', default='/var/lib/puppet/state/last_run_summary.yaml',
                         help='the puppet state file to parse')
     parser.add_argument('--disabled-lock-file', default='/var/lib/puppet/state/agent_disabled.lock',
@@ -100,15 +123,18 @@ def main(status):
 
     args = parser.parse_args()
 
-    if 0 < args.warning_run_age >= args.critical_run_age:
+    print(args.warning_run_age)
+    print(args.critical_run_age)
+
+    if no_timedelta < args.warning_run_age >= args.critical_run_age:
         status.add_status(MonitoringStatus.WARNING,
                           '--warning-run-age should be lower than --critical-warn-age')
 
-    if 0 < args.warning_catalog_age >= args.critical_catalog_age:
+    if no_timedelta < args.warning_catalog_age >= args.critical_catalog_age:
         status.add_status(MonitoringStatus.WARNING,
                           '--warning-catalog-age should be lower than --critical-catalog-age')
 
-    if 0 < args.warning_run_duration >= args.critical_run_duration:
+    if no_timedelta < args.warning_run_duration >= args.critical_run_duration:
         status.add_status(MonitoringStatus.WARNING,
                           '--warning-run-duration should be lower than --critical-run-duration')
 
@@ -148,9 +174,9 @@ def main(status):
                 catalog_date = datetime.fromtimestamp(catalog_time)
                 catalog_age = datetime.now() - catalog_date
 
-                if 0 < args.critical_catalog_age <= timedelta_total_seconds(catalog_age):
+                if no_timedelta < args.critical_catalog_age <= catalog_age:
                     catalog_status = MonitoringStatus.CRITICAL
-                elif 0 < args.warning_catalog_age <= timedelta_total_seconds(catalog_age):
+                elif no_timedelta < args.warning_catalog_age <= catalog_age:
                     catalog_status = MonitoringStatus.WARNING
                 else:
                     catalog_status = MonitoringStatus.OK
@@ -172,9 +198,9 @@ def main(status):
                     run_date = datetime.fromtimestamp(last_run)
                     run_age = datetime.now() - run_date
 
-                    if 0 < args.critical_run_age <= timedelta_total_seconds(run_age):
+                    if no_timedelta < args.critical_run_age <= run_age:
                         run_status = MonitoringStatus.CRITICAL
-                    elif 0 < args.warning_run_age <= timedelta_total_seconds(run_age):
+                    elif no_timedelta < args.warning_run_age <= run_age:
                         run_status = MonitoringStatus.WARNING
                     else:
                         run_status = MonitoringStatus.OK
@@ -188,9 +214,9 @@ def main(status):
                     else:
                         run_duration = timedelta(seconds=run_summary['time']['total'])
 
-                        if 0 < args.critical_run_duration <= timedelta_total_seconds(run_duration):
+                        if no_timedelta < args.critical_run_duration <= run_duration:
                             run_duration_status = MonitoringStatus.CRITICAL
-                        elif 0 < args.warning_run_duration <= timedelta_total_seconds(run_duration):
+                        elif no_timedelta < args.warning_run_duration <= run_duration:
                             run_duration_status = MonitoringStatus.WARNING
                         else:
                             run_duration_status = MonitoringStatus.OK
