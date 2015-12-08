@@ -27,7 +27,7 @@ setup(
     name='check-puppet-agent',
     version='1.0.0',
     url='https://github.com/wywygmbh/check-puppet-agent',
-    license='GPLv2',
+    license='Apache License 2.0',
     author='Christian Becker',
     author_email='christian.becker@wywy.com',
     description='A check to monitor puppet agent runs',
@@ -46,7 +46,7 @@ setup(
     classifiers=[
         'Environment :: Console',
         'Intended Audience :: System Administrators',
-        'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
+        'License :: OSI Approved :: Apache Software License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2',
