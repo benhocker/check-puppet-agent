@@ -18,15 +18,15 @@ The requirements are just:
 
 The package is easily available on pypi and can be just installed with pip, this also includes the command line script
 
-   $ pip install check-puppet-agent
+    $ pip install check-puppet-agent
 
 ### RPM
 
 Currently there are no prebuilt RPM packages provided, but you can built them by yourself with some simple commands
 
-   $ git clone ...
-   $ cd check-puppet-agent
-   $ python setup.py bdist_rpm
+    $ git clone ...
+    $ cd check-puppet-agent
+    $ python setup.py bdist_rpm
 
 ## Usage
 
@@ -57,7 +57,7 @@ Sample if the agent is disabled by `puppet agent --disable "test"`
                         [--filename FILENAME]
                         [--disabled-lock-file DISABLED_LOCK_FILE]
                         [--run-lock-file RUN_LOCK_FILE]
-
+   
     optional arguments:
       -h, --help            show this help message and exit
       --warning-run-age WARNING_RUN_AGE
