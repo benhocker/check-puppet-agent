@@ -8,7 +8,7 @@ It is tested as a sensu check plugin, but also compatible with nagios/icinga/...
 
 ### dependencies
 
-The requirements are just:
+The requirements are just - they are automatically installed by pip and the rpm package:
 
 - `argparse` (command line argument parsing)
 - `yaml` (to read the puppet state files)
@@ -24,7 +24,7 @@ The package is easily available on pypi and can be just installed with pip, this
 
 Currently there are no prebuilt RPM packages provided, but you can built them by yourself with some simple commands
 
-    $ git clone ...
+    $ git clone git://github.com/wywygmbh/check-puppet-agent.git
     $ cd check-puppet-agent
     $ python setup.py bdist_rpm
 
